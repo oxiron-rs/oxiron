@@ -2,5 +2,14 @@
 name = "oxiron"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "A lightweight, zero-dependency utility library for Rust."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/oxiron-rs/oxiron"
+homepage = "https://github.com/oxiron-rs/oxiron"
+documentation = "https://docs.rs/oxiron"
+readme = "README.md"
+keywords = ["utility", "toolkit", "library"]
+categories = ["development-tools"]
 
 [dependencies]
