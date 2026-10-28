@@ -2,7 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/oxiron.svg)](https://crates.io/crates/oxiron)
 [![docs.rs](https://img.shields.io/docsrs/oxiron)](https://docs.rs/oxiron)
-[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)]()
 
 A lightweight, zero-dependency utility library for Rust.
 
@@ -34,7 +34,4 @@ fn main() {
 
 Licensed under either of
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
-
-at your option.
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>)
