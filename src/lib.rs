@@ -1,9 +1,3 @@
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn mian() {
-        let arr: [i32; 100] = [0; 100];
-        println!("{}", arr.len());
-    }
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
 }
