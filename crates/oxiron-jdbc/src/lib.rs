@@ -24,6 +24,7 @@
 
 use std::fmt;
 
+pub mod postgres;
 pub mod sqlite;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -329,6 +330,58 @@ where
         Some(row) => T::from_value(row.first_value()?.clone()),
         None => Err(JdbcError::NoRows),
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SQL 模板占位符方言（`#{name}` → 驱动方言，逻辑在核心层）
+// ─────────────────────────────────────────────────────────────────────
+
+/// 预编译语句占位符方言。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PlaceholderStyle {
+    /// `?`（SQLite / MySQL）
+    Question,
+    /// `$1, $2, ...`（PostgreSQL）
+    DollarNumber,
+}
+
+/// 把 SQL 模板中的 `#{name}` 按出现顺序展开为驱动方言占位符。
+///
+/// 普通 SQL（不含 `#{}`）原样返回。`#{}` 只在模板层面有意义，
+/// 字符串字面量内的 `#{}` 也会被展开（使用时避免在 SQL 字符串里写 `#{}`）。
+pub fn expand_placeholders(sql: &str, style: PlaceholderStyle) -> Result<String, JdbcError> {
+    let mut out = String::with_capacity(sql.len());
+    let mut rest = sql;
+    let mut n = 0usize;
+    while let Some(pos) = rest.find("#{") {
+        out.push_str(&rest[..pos]);
+        let after = &rest[pos + 2..];
+        let end = after
+            .find('}')
+            .ok_or_else(|| JdbcError::Conversion("SQL 模板中存在未闭合的 `#{`".into()))?;
+        let name = &after[..end];
+        let valid = !name.is_empty()
+            && name
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if !valid {
+            return Err(JdbcError::Conversion(format!(
+                "非法的占位符参数名 `#{{{name}}}`"
+            )));
+        }
+        n += 1;
+        match style {
+            PlaceholderStyle::Question => out.push('?'),
+            PlaceholderStyle::DollarNumber => out.push_str(&format!("${n}")),
+        }
+        rest = &after[end + 1..];
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 // ─────────────────────────────────────────────────────────────────────

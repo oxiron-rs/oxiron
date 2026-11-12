@@ -1,7 +1,7 @@
 //! SQLite 驱动（对标 `sqlite-jdbc`）：用 `libsqlite3-sys` 实现 JDBC 核心 trait。
 //!
 //! 这是 oxiron-jdbc 的第一个驱动实现；未来 MySQL/PostgreSQL 驱动
-//! 只需同样实现 [`crate::Connection`] / [`crate::PreparedStatement`] / [`crate::ResultSet`]。
+//! 只需同样实现 [`Connection`] / [`PreparedStatement`] / [`ResultSet`]。
 
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::marker::PhantomData;
@@ -64,7 +64,9 @@ impl SqliteConnection {
 
 impl Connection for SqliteConnection {
     fn prepare(&self, sql: &str) -> Result<Box<dyn PreparedStatement + '_>, JdbcError> {
-        let c_sql = to_cstring(sql)?;
+        // 模板占位符 `#{name}` → `?`（方言展开在驱动层完成）
+        let sql = crate::expand_placeholders(sql, crate::PlaceholderStyle::Question)?;
+        let c_sql = to_cstring(&sql)?;
         let mut stmt: *mut ffi::sqlite3_stmt = std::ptr::null_mut();
         let rc = unsafe {
             ffi::sqlite3_prepare_v2(self.raw, c_sql.as_ptr(), -1, &mut stmt, std::ptr::null_mut())

@@ -211,8 +211,7 @@ fn expand_inner(attr: TokenStream, item: TokenStream, kind: Kind) -> syn::Result
     let (out_ty, inner, err_given) = extract_result(&sig.output)?;
     let fetch = classify(&inner, kind)?;
 
-    // ── 6. 代码生成：调用 oxiron_jdbc（预编译语句 + 位置绑定） ──────
-    let rewritten = rewrite_sql(&sql_text);
+    // ── 6. 代码生成：调用 oxiron_jdbc（SQL 模板由驱动按方言展开占位符） ──
     let bind_stmts = bind_idents.iter().enumerate().map(|(i, ident)| {
         let idx = i + 1;
         quote! {
@@ -236,7 +235,7 @@ fn expand_inner(attr: TokenStream, item: TokenStream, kind: Kind) -> syn::Result
     };
 
     let body = quote! {{
-        let mut stmt = ::oxiron_jdbc::Connection::prepare(#conn_ident, #rewritten)?;
+        let mut stmt = ::oxiron_jdbc::Connection::prepare(#conn_ident, #sql_text)?;
         #(#bind_stmts)*
         let __out = #fetch_expr;
         ::core::result::Result::Ok(__out)
@@ -450,27 +449,6 @@ fn scan_placeholders(sql: &str, span: Span) -> syn::Result<Vec<String>> {
         }
     }
     Ok(names)
-}
-
-/// 把每个 `#{name}` 按出现顺序改写为 `?`。
-fn rewrite_sql(sql: &str) -> String {
-    let mut out = String::with_capacity(sql.len());
-    let mut rest = sql;
-    while let Some(pos) = rest.find("#{") {
-        out.push_str(&rest[..pos]);
-        match rest[pos + 2..].find('}') {
-            Some(end) => {
-                out.push('?');
-                rest = &rest[pos + 2 + end + 1..];
-            }
-            None => {
-                out.push_str(&rest[pos..]);
-                return out;
-            }
-        }
-    }
-    out.push_str(rest);
-    out
 }
 
 fn names_list(params: &[(syn::Ident, Type)]) -> String {

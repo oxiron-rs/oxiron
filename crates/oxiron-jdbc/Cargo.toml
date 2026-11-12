@@ -8,3 +8,8 @@ license = "Apache-2.0"
 
 [dependencies]
 libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+# PostgreSQL 驱动：认证（SCRAM-SHA-256 / md5）所需的小型加密库
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+md-5 = "0.10"

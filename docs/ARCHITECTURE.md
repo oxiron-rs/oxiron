@@ -126,10 +126,11 @@ async fn find_by_id(pool: &SqlitePool, id: i64) -> Result<Option<User>>;
 - `#{name}` 与形参名严格互查：拼错、漏参、多余参数均编译报错（已验证，报错信息含可用参数列表）；
 - 生成代码一律走**预编译语句绑定**，天然防 SQL 注入（MyBatis 的 `#{}` 同款语义，且不提供 `${}` 字符串拼接）。
 
-**原型状态**：`crates/oxiron-sql`（宏）+ `crates/oxiron-jdbc`（JDBC 抽象层 + SQLite 驱动）+ `examples/mybatis_demo.rs`（SQLite 端到端已验证：增删改查、单行/多行/标量/None、参数乱序映射，**零 sqlx 依赖**）。
+**原型状态**：`crates/oxiron-sql`（宏）+ `crates/oxiron-jdbc`（JDBC 抽象层 + **SQLite/PostgreSQL 双驱动**）+ `examples/mybatis_demo.rs`（SQLite 端到端，已实测）+ `examples/pgsql_demo.rs`（PG 端到端），**零 sqlx 依赖**。PG 驱动为纯 Rust 自研 wire protocol v3 实现，认证支持 trust / password / md5 / **SCRAM-SHA-256**（加密链路经 RFC 7677 向量与 .NET 密码库交叉验证）。
 
 **原型限制与路线：**
-- 占位符生成 `?`（SQLite/MySQL）；Postgres `$n` 待加（方案：改写逻辑下沉 `oxiron-jdbc` 按驱动方言生成，符合"宏薄、逻辑在核心层"）；
+- 占位符方言：**已解决**——`#{name}` 模板由驱动在 `prepare` 时按方言展开（SQLite→`?`、PostgreSQL→`$1..$n`），`expand_placeholders` 位于核心层，`?`/`$n` 等原生 SQL 语法不受影响；
+- PG 驱动暂不支持 SSL/TLS 连接与 GSS/SSPI 认证（本地/内网 PG 不受影响），后续按需补；
 - 动态 SQL（MyBatis `<if>`/`<foreach>`）留待 M3+，倾向轻量 token 语法而非 XML；
 - 批量插入、`last_insert_rowid`/生成键回填待设计；
 - 返回类型错误信息依赖 `trybuild` 建测试固化。
@@ -143,7 +144,7 @@ oxiron/  （cargo workspace）
 ├── Cargo.toml                  # [workspace] 统一依赖版本、lint 配置
 ├── crates/
 │   ├── oxiron-core             # 容器、生命周期、扩展点        [零依赖]
-│   ├── oxiron-jdbc             # JDBC 抽象层 + SQLite 驱动       [libsqlite3-sys]
+│   ├── oxiron-jdbc             # JDBC 抽象层 + SQLite/PG 驱动    [libsqlite3-sys, sha2, hmac, md-5]
 │   ├── oxiron-sql              # SQL 映射宏 #[sql]/#[derive(FromRow)] [syn/quote]
 │   ├── oxiron-macros           # DI/装配/路由宏（规划）          [syn/quote]
 │   ├── oxiron-config           # 配置、profiles、类型化配置     [figment|config-rs]
