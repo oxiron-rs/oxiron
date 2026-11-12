@@ -126,7 +126,7 @@ async fn find_by_id(pool: &SqlitePool, id: i64) -> Result<Option<User>>;
 - `#{name}` 与形参名严格互查：拼错、漏参、多余参数均编译报错（已验证，报错信息含可用参数列表）；
 - 生成代码一律走**预编译语句绑定**，天然防 SQL 注入（MyBatis 的 `#{}` 同款语义，且不提供 `${}` 字符串拼接）。
 
-**原型状态**：`crates/oxiron-sql`（宏）+ `crates/oxiron-jdbc`（JDBC 抽象层 + **SQLite/PostgreSQL 双驱动**）+ `examples/mybatis_demo.rs`（SQLite 端到端，已实测）+ `examples/pgsql_demo.rs`（PG 端到端），**零 sqlx 依赖**。PG 驱动为纯 Rust 自研 wire protocol v3 实现，认证支持 trust / password / md5 / **SCRAM-SHA-256**（加密链路经 RFC 7677 向量与 .NET 密码库交叉验证）。
+**原型状态**：`crates/oxiron-sql`（宏）+ `crates/oxiron-jdbc`（JDBC 抽象层 + **SQLite/PostgreSQL 双驱动**）+ `tests/sqlite_mapper.rs` / `tests/pg_mapper.rs`（端到端集成测试，PG 测试经 `OXIRON_PG_URL` 门控），**零 sqlx 依赖**。PG 驱动为纯 Rust 自研 wire protocol v3 实现，认证支持 trust / password / md5 / **SCRAM-SHA-256**（加密链路经 RFC 7677 向量与 .NET 密码库交叉验证）。
 
 **原型限制与路线：**
 - 占位符方言：**已解决**——`#{name}` 模板由驱动在 `prepare` 时按方言展开（SQLite→`?`、PostgreSQL→`$1..$n`），`expand_placeholders` 位于核心层，`?`/`$n` 等原生 SQL 语法不受影响；
@@ -153,7 +153,7 @@ oxiron/  （cargo workspace）
 │   ├── oxiron-security         # 认证授权中间件                [M4]
 │   ├── oxiron-actuator         # /actuator/* 生产就绪端点      [web]
 │   └── oxiron-starter-web      # 起步依赖聚合 + 默认自动配置
-├── examples/                   # 面向用户的示例程序
+├── tests/                      # 集成测试（SQLite/PG 端到端，#[sql] Mapper 契约）
 ├── docs/                       # 架构文档、指南
 └── oxiron-cli                  # oxiron new 脚手架 [M5]
 ```
