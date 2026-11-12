@@ -27,7 +27,7 @@ oxiron 是一个 Rust 全栈应用框架，目标是让 Rust 开发者获得与 
 - ❌ 不做 Spring API 的兼容层（不叫 `@RestController`，不复刻包名）；
 - ❌ 不支持同步运行时（只支持 tokio）；
 - ❌ M1–M5 期间不做微服务治理全家桶（服务发现、配置中心、熔断限流留到 1.0 之后）；
-- ❌ 不自研 HTTP 协议栈、连接池等基础设施（站在 axum/tower/sqlx 的肩膀上）；
+- ❌ 不自研 HTTP 协议栈（站在 axum/tower 的肩膀上）；数据库层自研 `oxiron-jdbc` JDBC 抽象（对标 `java.sql`），驱动内核复用成熟绑定（如 `libsqlite3-sys`）；
 - ❌ 不追求 `oxiron-core` 之外的零依赖（框架必然依赖生态，零依赖只保留给核心叶子 crate）。
 
 ---
@@ -41,7 +41,7 @@ oxiron 是一个 Rust 全栈应用框架，目标是让 Rust 开发者获得与 
 | 自动装配 + starter | feature + builder + starter 聚合 crate | `oxiron-starter-*` | 见 §3.3 |
 | 内嵌服务器（Tomcat） | tokio + hyper/axum | `oxiron-web` | 不自研 |
 | Spring MVC（@RestController） | 路由宏 `#[controller]` `#[get]` | `oxiron-macros` | 语法糖层 |
-| Spring Data JPA | sqlx 封装 + repository 宏 | `oxiron-data` | SQL 编译期校验是差异点 |
+| Spring Data JPA | `oxiron-jdbc`（JDBC 抽象）+ `oxiron-sql`（`#[sql]` 映射宏） | `oxiron-jdbc` + `oxiron-sql` | ✅ 已落地原型，映射体验对标 MyBatis |
 | application.yml + profiles | toml + env 覆盖 + profile | `oxiron-config` | `application-dev.toml` |
 | @ConfigurationProperties | 类型化配置结构体 + derive | `oxiron-config` | |
 | Spring Security | 鉴权中间件 + extractor | `oxiron-security`（M4） | |
@@ -100,6 +100,40 @@ axum 的 `Handler` + `Router` + `tower::Layer` 体系与我们的中间件/AOP �
 - MSRV：**1.85**，Edition 2024（与当前 Cargo.toml 一致）；
 - 质量门禁：`cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`、`cargo doc --no-deps`，全部进 CI。
 
+### 3.6 D6：数据映射层 —— MyBatis 风格 SQL Mapper（`#[sql]` 系列宏）★已验证原型
+
+**痛点**：Rust 现有方案（sqlx `query!` / sea-orm）要么手拼 SQL 字符串、要么 ORM 抽象过重，缺少 MyBatis "Mapper 接口 = SQL 注解 + 方法签名" 的轻量映射体验。
+
+**决策：用属性宏实现 SQL 映射方法——签名 + SQL 即实现。**
+
+```rust
+#[select("SELECT id, name, age FROM users WHERE id = #{id}")]
+async fn find_by_id(pool: &SqlitePool, id: i64) -> Result<Option<User>>;
+```
+
+**映射规则（MyBatis ↔ oxiron）：**
+
+| MyBatis | oxiron `#[sql]` 系列 | 说明 |
+|---|---|---|
+| Mapper 接口方法（无实现） | 无函数体的 `async fn` 签名 | 宏生成函数体 |
+| `@Select` / `@Insert` / ... | `#[select]` / `#[insert]` / `#[update]` / `#[delete]` / `#[sql]`（自动推断） | 属性内是 SQL 文本 |
+| `#{name}` 占位符 | `#{name}`，按 **参数名** 对应 fn 形参 | 与参数书写顺序无关 |
+| 参数类型处理器 | `ToValue` / `FromValue`（oxiron-jdbc 类型系统） | |
+| 返回值映射 | `Option<T>`→单行可选；`Vec<T>`→多行；`T`→单行；标量→`query_scalar`/受影响行数；`()`→执行 | 按返回类型推断 |
+| `SqlSession.getMapper()` | 直接调用生成的 async fn（连接池作第一参数） | |
+
+**安全与校验（编译期）：**
+- `#{name}` 与形参名严格互查：拼错、漏参、多余参数均编译报错（已验证，报错信息含可用参数列表）；
+- 生成代码一律走**预编译语句绑定**，天然防 SQL 注入（MyBatis 的 `#{}` 同款语义，且不提供 `${}` 字符串拼接）。
+
+**原型状态**：`crates/oxiron-sql`（宏）+ `crates/oxiron-jdbc`（JDBC 抽象层 + SQLite 驱动）+ `examples/mybatis_demo.rs`（SQLite 端到端已验证：增删改查、单行/多行/标量/None、参数乱序映射，**零 sqlx 依赖**）。
+
+**原型限制与路线：**
+- 占位符生成 `?`（SQLite/MySQL）；Postgres `$n` 待加（方案：改写逻辑下沉 `oxiron-jdbc` 按驱动方言生成，符合"宏薄、逻辑在核心层"）；
+- 动态 SQL（MyBatis `<if>`/`<foreach>`）留待 M3+，倾向轻量 token 语法而非 XML；
+- 批量插入、`last_insert_rowid`/生成键回填待设计；
+- 返回类型错误信息依赖 `trybuild` 建测试固化。
+
 ---
 
 ## 4. 模块划分与依赖规则
@@ -109,10 +143,12 @@ oxiron/  （cargo workspace）
 ├── Cargo.toml                  # [workspace] 统一依赖版本、lint 配置
 ├── crates/
 │   ├── oxiron-core             # 容器、生命周期、扩展点        [零依赖]
-│   ├── oxiron-macros           # proc-macro 语法糖             [syn/quote]
+│   ├── oxiron-jdbc             # JDBC 抽象层 + SQLite 驱动       [libsqlite3-sys]
+│   ├── oxiron-sql              # SQL 映射宏 #[sql]/#[derive(FromRow)] [syn/quote]
+│   ├── oxiron-macros           # DI/装配/路由宏（规划）          [syn/quote]
 │   ├── oxiron-config           # 配置、profiles、类型化配置     [figment|config-rs]
 │   ├── oxiron-web              # 路由、中间件、异常处理         [axum, tower, tokio]
-│   ├── oxiron-data             # 连接池、事务、repository 宏    [sqlx]
+│   ├── oxiron-data             # 连接池、事务管理（规划）        [oxiron-jdbc]
 │   ├── oxiron-security         # 认证授权中间件                [M4]
 │   ├── oxiron-actuator         # /actuator/* 生产就绪端点      [web]
 │   └── oxiron-starter-web      # 起步依赖聚合 + 默认自动配置
@@ -124,9 +160,9 @@ oxiron/  （cargo workspace）
 **依赖规则（CI 用 `cargo-deny` 或手工评审把关）：**
 
 1. `oxiron-core` 不依赖 workspace 内任何 crate，不依赖 web/async 生态（零依赖基因保留在这里）；
-2. `oxiron-macros` 只依赖 `syn`/`quote`/`proc-macro2`，生成的代码只调用 `oxiron-core`；
+2. `oxiron-sql` / `oxiron-macros` 只依赖 `syn`/`quote`/`proc-macro2`，生成的代码只调用 `oxiron-jdbc` / `oxiron-core` 的公开 API；
 3. 依赖方向单向：`starter-* → web/actuator/config → core`，禁止反向；
-4. `oxiron-data` / `oxiron-security` 相互独立，只能依赖 core/config；
+4. `oxiron-jdbc` 不依赖 workspace 内其他 crate；`oxiron-data` / `oxiron-security` 相互独立，只能依赖 `oxiron-jdbc`/core/config；
 5. workspace 外的依赖版本统一在根 `Cargo.toml` 用 `[workspace.dependencies]` 管理。
 
 ---

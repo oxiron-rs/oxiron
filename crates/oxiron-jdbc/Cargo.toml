@@ -1,0 +1,10 @@
+[package]
+name = "oxiron-jdbc"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "JDBC-style database abstraction layer for the oxiron framework."
+license = "Apache-2.0"
+
+[dependencies]
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }

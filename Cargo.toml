@@ -13,3 +13,8 @@ keywords = ["utility", "toolkit", "library"]
 categories = ["development-tools"]
 
 [dependencies]
+oxiron-sql = { path = "crates/oxiron-sql" }
+oxiron-jdbc = { path = "crates/oxiron-jdbc" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

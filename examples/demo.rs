@@ -1,32 +1,69 @@
-//! oxiron 使用示例程序。
-//!
-//! `examples/` 目录下每个 `.rs` 文件都会被编译成一个独立的二进制程序，
-//! 自动链接 oxiron 库本身，模拟真实用户在自己项目中的调用方式。
-//!
-//! 运行方式：
-//! ```powershell
-//! cargo run --example demo
-//! ```
-
-use oxiron::add;
-
 fn main() {
-    println!("=== oxiron demo ===");
+    let mut a: A = A::new(1, 2, 3, 4);
+    a.set_a(10);
+    println!("{:?}", a.get_a());
+    println!("{:?}", a.get_b());
+    println!("{:?}", a.get_c());
+    println!("{:?}", a.get_d());
 
-    // 1. 基本用法
-    let sum = add(2, 2);
-    println!("add(2, 2) = {sum}");
-    assert_eq!(sum, 4);
+    const B: i32 = 10;
+    println!("{:?}", B);
+    let mut b: i32 = 20;
+    b += 10;
+    {
+        let mut b: i32 = 30;
+        b += 10;
+        println!("{:?}", b + 10);
+    }
+    println!("{:?}", b + 10);
+    let y = {
+        let x = 3;
+        x + 1
+    };
 
-    // 2. 负数与零
-    println!("add(-5, 3) = {}", add(-5, 3));
-    println!("add(42, 0) = {}", add(42, 0));
+    println!("The value of y is: {y}");
 
-    // 3. 实际场景：对一组数字求和
-    let numbers = [1, 2, 3, 4, 5];
-    let total = numbers.iter().copied().fold(0, add);
-    println!("sum of {numbers:?} = {total}");
-    assert_eq!(total, 15);
+    let x = plus_one(5);
 
-    println!("所有断言通过 ✓");
+    println!("The value of x is: {x}");
+}
+
+fn plus_one(mut x: i32) -> i32 {
+    x = x + 1;
+    const A: i32 = 1;
+    x = x + A;
+    x
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct A {
+    a: i32,
+    b: i32,
+    c: i32,
+    d: i32,
+}
+
+impl A {
+    fn new(a: i32, b: i32, c: i32, d: i32) -> Self {
+        A { a, b, c, d }
+    }
+    fn get_a(&self) -> i32 {
+        self.a
+    }
+    fn set_a(&mut self, a: i32) -> i32 {
+        self.a = a;
+        self.a
+    }
+    fn get_b(&self) -> i32 {
+        self.b
+    }
+    fn get_c(&self) -> i32 {
+        self.c
+    }
+    fn get_d(&self) -> i32 {
+        self.d
+    }
+    fn add(&self) -> Self  {
+        A::new(self.a + self.b + self.c + self.d, 0, 0, 0)
+    }
 }
