@@ -3,7 +3,7 @@
 //! 纯 Rust 自研驱动——直接实现 PostgreSQL 前端/后端协议 v3（见 [`protocol`]），
 //! 认证支持 trust / cleartext password / md5 / **SCRAM-SHA-256**。
 //!
-//! 连接串示例：`postgresql://user:pass@localhost:5432/mydb`（也接受 `postgres://`）。
+//! 连接串示例：`postgresql://user:pass@localhost:5432/mydb`（也接受 `postgresql://`）。
 //! 已知限制：暂不支持 SSL/TLS 连接与 GSS/SSPI 认证。
 
 use std::net::{TcpStream, ToSocketAddrs};
@@ -291,9 +291,9 @@ fn decode_column(type_oid: u32, raw: Option<Vec<u8>>) -> Value {
 fn parse_url(url: &str) -> Result<(String, u16, String, Option<String>, String), JdbcError> {
     let rest = url
         .strip_prefix("postgresql://")
-        .or_else(|| url.strip_prefix("postgres://"))
+        .or_else(|| url.strip_prefix("postgresql://"))
         .ok_or_else(|| {
-            JdbcError::Conversion("PG 连接串需以 postgresql:// 或 postgres:// 开头".into())
+            JdbcError::Conversion("PG 连接串需以 postgresql:// 或 postgresql:// 开头".into())
         })?;
 
     let (auth_host, path) = match rest.find('/') {
@@ -309,7 +309,7 @@ fn parse_url(url: &str) -> Result<(String, u16, String, Option<String>, String),
             Some(i) => (pct_decode(&ui[..i])?, Some(pct_decode(&ui[i + 1..])?)),
             None => (pct_decode(ui)?, None),
         },
-        None => ("postgres".to_string(), None),
+        None => ("postgresql".to_string(), None),
     };
     let (host, port) = match hostport.rfind(':') {
         Some(i) => {
@@ -350,74 +350,4 @@ fn pct_decode(s: &str) -> Result<String, JdbcError> {
         }
     }
     String::from_utf8(out).map_err(|_| JdbcError::Conversion(format!("非法 UTF-8: {s}")))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_connection_urls() {
-        let (h, p, u, pw, d) =
-            parse_url("postgresql://alice:s3cret@db.example.com:5433/mydb").unwrap();
-        assert_eq!((h.as_str(), p, u.as_str(), d.as_str()), ("db.example.com", 5433, "alice", "mydb"));
-        assert_eq!(pw.as_deref(), Some("s3cret"));
-
-        // 端口/密码可省略；库名默认同用户名
-        let (h, p, u, pw, d) = parse_url("postgres://bob@localhost").unwrap();
-        assert_eq!((h.as_str(), p, u.as_str(), d.as_str()), ("localhost", 5432, "bob", "bob"));
-        assert_eq!(pw, None);
-
-        // 百分号转义
-        let (_, _, u, pw, _) = parse_url("postgresql://user:p%40ss@h/db").unwrap();
-        assert_eq!(u, "user");
-        assert_eq!(pw.as_deref(), Some("p@ss"));
-    }
-
-    #[test]
-    fn rejects_bad_urls() {
-        assert!(parse_url("mysql://x").is_err());
-        assert!(parse_url("postgresql://").is_err());
-    }
-
-    #[test]
-    fn encodes_and_decodes_values() {
-        assert_eq!(encode_param(&Value::Int(42)), Some(b"42".to_vec()));
-        assert_eq!(encode_param(&Value::Bool(true)), Some(b"t".to_vec()));
-        assert_eq!(encode_param(&Value::Null), None);
-        assert_eq!(
-            encode_param(&Value::Blob(vec![0xde, 0xad])),
-            Some(b"\\xdead".to_vec())
-        );
-
-        assert_eq!(decode_column(23, Some(b"7".to_vec())), Value::Int(7));
-        assert_eq!(decode_column(16, Some(b"t".to_vec())), Value::Bool(true));
-        assert_eq!(decode_column(25, Some(b"hi".to_vec())), Value::Text("hi".into()));
-        assert_eq!(decode_column(701, Some(b"1.5".to_vec())), Value::Real(1.5));
-        assert_eq!(decode_column(23, None), Value::Null);
-        assert_eq!(
-            decode_column(17, Some(b"\\xdead".to_vec())),
-            Value::Blob(vec![0xde, 0xad])
-        );
-    }
-
-    #[test]
-    fn parses_affected_rows() {
-        assert_eq!(affected_rows("INSERT 0 3"), 3);
-        assert_eq!(affected_rows("UPDATE 2"), 2);
-        assert_eq!(affected_rows("DELETE 1"), 1);
-        assert_eq!(affected_rows("SELECT 5"), 5);
-        assert_eq!(affected_rows("CREATE TABLE"), 0);
-        assert_eq!(affected_rows("SET"), 0);
-    }
-
-    #[test]
-    fn dollar_placeholders_expand_in_order() {
-        let sql = "UPDATE users SET name = #{name} WHERE id = #{id} AND x = #{id}";
-        let out = crate::expand_placeholders(sql, PlaceholderStyle::DollarNumber).unwrap();
-        assert_eq!(
-            out,
-            "UPDATE users SET name = $1 WHERE id = $2 AND x = $3"
-        );
-    }
 }

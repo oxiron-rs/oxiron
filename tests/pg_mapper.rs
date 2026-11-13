@@ -13,7 +13,7 @@
 //! 覆盖与 `sqlite_mapper` 相同的契约：增删改查、单行/多行/标量/None、参数按名字映射。
 
 use oxiron::{delete, insert, select, sql, update, FromRow};
-use oxiron_jdbc::postgres::{PgConnection, PgDataSource};
+use oxiron_jdbc::postgresql::{PgConnection, PgDataSource};
 use oxiron_jdbc::DataSource;
 
 #[derive(Debug, FromRow, PartialEq)]

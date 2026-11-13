@@ -24,7 +24,7 @@
 
 use std::fmt;
 
-pub mod postgres;
+pub mod postgresql;
 pub mod sqlite;
 
 // ─────────────────────────────────────────────────────────────────────
