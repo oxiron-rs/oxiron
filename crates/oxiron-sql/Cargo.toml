@@ -1,10 +1,10 @@
 [package]
 name = "oxiron-sql"
-version = "0.1.0"
-edition = "2024"
-rust-version = "1.85"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "MyBatis-style SQL mapper procedural macros for the oxiron framework."
-license = "Apache-2.0"
 
 [lib]
 proc-macro = true
