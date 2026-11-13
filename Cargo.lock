@@ -138,6 +138,7 @@ dependencies = [
 name = "oxiron-sql"
 version = "0.1.0"
 dependencies = [
+ "oxiron-jdbc",
  "proc-macro2",
  "quote",
  "syn",

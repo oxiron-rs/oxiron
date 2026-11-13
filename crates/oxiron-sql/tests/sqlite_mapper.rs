@@ -6,7 +6,7 @@
 //! 覆盖：增删改查、单行/多行/标量/None 各种返回形状、参数按名字映射（与书写顺序无关）。
 //! 每个测试使用独立的内存库（`sqlite::memory:`），互不干扰、可并行。
 
-use oxiron::{delete, insert, select, sql, update, FromRow};
+use oxiron_sql::{delete, insert, select, sql, update, FromRow};
 use oxiron_jdbc::sqlite::{SqliteConnection, SqliteDataSource};
 use oxiron_jdbc::DataSource;
 

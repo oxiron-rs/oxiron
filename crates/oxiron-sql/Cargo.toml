@@ -13,3 +13,8 @@ proc-macro = true
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
+
+# 集成测试需要真实驱动执行宏生成的代码（dev-dep 不构成依赖环：
+# oxiron-jdbc 并不依赖 oxiron-sql）
+[dev-dependencies]
+oxiron-jdbc = { path = "../oxiron-jdbc" }
