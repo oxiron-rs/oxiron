@@ -15,3 +15,7 @@ categories = ["development-tools"]
 [dependencies]
 oxiron-sql = { path = "crates/oxiron-sql" }
 oxiron-jdbc = { path = "crates/oxiron-jdbc" }
+
+[workspace]
+members = ["crates/*"]
+resolver = "3"    # Edition 2024 默认解析器
