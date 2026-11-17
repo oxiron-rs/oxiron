@@ -37,9 +37,11 @@ fn lib_test() {
     user.get_id();
     user.get_name();
     user.get_age();
+
     println!("{:?}", user);
-    let b = &mut user;
+    let b: &mut User = &mut user;
     b.set_id(2);
+    User::set_id(b, 3);
     b.set_name("Bob".to_string());
     b.set_age(25);
     println!("{:?}", b);
